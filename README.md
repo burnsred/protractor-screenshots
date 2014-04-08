@@ -1,4 +1,9 @@
 ## Quick overview
+Install with
+```
+npm install protractor-screenshots
+```
+
 When starting a test suite, initialize for screenshots
 ```js
 screenshots = require('protractor-screenshots');
