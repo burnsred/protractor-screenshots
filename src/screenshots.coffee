@@ -11,8 +11,14 @@ browser.getCapabilities().then (capabilities) ->
 disableScreenshots = browser.params['disable-screenshots']
 screenshotBase = browser.params['screenshots-base-path'] || '.'
 
-getPath = (suiteName) ->
-    return screenshotBase + '/' + slug(suiteName) + '/' + browserName
+getPath = (suite) ->
+    buildName = (suite) ->
+        prefix = ''
+        if suite.parentSuite
+            prefix = "#{buildName(suite.parentSuite)} "
+        return "#{prefix}#{suite.description}"
+
+    return screenshotBase + '/' + slug(buildName(suite)) + '/' + browserName
 
 screenshotMatchers = {
     toMatchScreenshots: (name) ->
@@ -21,7 +27,13 @@ screenshotMatchers = {
 
         me = this
 
-        path = getPath(me.spec.suite.description)
+        path = getPath(me.spec.suite)
+
+        if not me.spec.suite._screenshotsInitialized
+            # Clear the old failure shots
+            rimraf.sync(path + '/failed')
+            rimraf.sync(path + '/diff')
+            me.spec.suite._screenshotsInitialized = true
 
         matchScreenshot = (screenshot) ->
             matches = false
@@ -118,12 +130,6 @@ Public API
 
 # To be called during test suite setup
 exports.initializeSuite = (suite) ->
-    path = getPath(suite.description)
-
-    # Clear the old failure shots
-    rimraf.sync(path + '/failed')
-    rimraf.sync(path + '/diff')
-
     beforeEach () ->
         this.addMatchers(screenshotMatchers)
 
