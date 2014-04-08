@@ -9,7 +9,7 @@ browser.getCapabilities().then (capabilities) ->
     browserName = capabilities.caps_.browserName.toLowerCase()
 
 disableScreenshots = browser.params['disable-screenshots']
-screenshotBase = browser.params['screenshots-base-path'] || ''
+screenshotBase = browser.params['screenshots-base-path'] || '.'
 
 getPath = (suiteName) ->
     return screenshotBase + '/' + slug(suiteName) + '/' + browserName
