@@ -4,26 +4,23 @@ Install with
 npm install protractor-screenshots
 ```
 
-When starting a test suite, initialize for screenshots
+At the top of the test spec you need
 ```js
 screenshots = require('protractor-screenshots');
-
-describe('apps', function() {
-    screenshots.initializeSuite(this);
-});
 ```
 
 During a test, run
 ```
-expect(screenshots.takeScreenshots()).toMatchScreenshots('my-screenshot-name')
+screenshots.checkScreenshots('my-screenshot-name')
 ```
 
 If screenshots do not exist, or do not match, test output will show
 ```
-screenshots [desktop-1280x1000, ipad-landscape-1024x1000, ipad-portrait-768x1000, iphone-landscape-480x1000, iphone-portrait-320x1000] for login-failed did not match
+Expected false to be true, 'empty-memory - iphone-landscape-480x1000: differed by 0.13%'.
+Expected false to be true, 'full-memory - ipad-portrait-768x1000: missing'.
 ```
-and failed screenshots will be created and categorised by name, suite, spec,
-size and browser under the screenshot base path.
+and failed or missing screenshots will be created and categorised by name,
+suite, spec, size and browser under the screenshot base path.
 
 ## Configure new/different screen sizes
 

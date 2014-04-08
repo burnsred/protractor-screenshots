@@ -3,6 +3,7 @@ mkdirp = require 'mkdirp'
 rimraf = require 'rimraf'
 slug = require 'slug'
 resemble = require('resemble').resemble
+Q = require 'q'
 
 browserName = ''
 browser.getCapabilities().then (capabilities) ->
@@ -20,81 +21,113 @@ getPath = (suite) ->
 
     return screenshotBase + '/' + slug(buildName(suite)) + '/' + browserName
 
-screenshotMatchers = {
-    toMatchScreenshots: (name) ->
-        if disableScreenshots
-            return true
+matchScreenshot = (spec, screenshotName, screenshot) ->
+    path = getPath(spec.suite)
 
-        me = this
+    label = "#{screenshotName} - #{screenshot.label}-#{screenshot.width}x#{screenshot.height}"
+    filename = "#{slug(spec.description + " " + screenshotName)}-#{screenshot.label}-#{screenshot.width}x#{screenshot.height}.png"
 
-        path = getPath(me.spec.suite)
-
-        if not me.spec.suite._screenshotsInitialized
+    return Q.fcall () ->
+        if not spec.suite._screenshotsInitialized
             # Clear the old failure shots
-            rimraf.sync(path + '/failed')
-            rimraf.sync(path + '/diff')
-            me.spec.suite._screenshotsInitialized = true
+            return Q.all([
+                Q.nfcall(rimraf, path + '/missing'),
+                Q.nfcall(rimraf, path + '/failed'),
+                Q.nfcall(rimraf, path + '/diff')
+            ])
+        else
+            return true
+    .then () ->
+        spec.suite._screenshotsInitialized = true
 
-        matchScreenshot = (screenshot) ->
-            matches = false
+        return Q.nfcall(fs.readFile, path + '/' + filename)
+    .then (data) ->
+        # Fast check via string matching
+        if screenshot.data == data.toString('base64')
+            return { match: true }
 
-            filename = "#{slug(me.spec.description + " " + name)}-#{screenshot.label}-#{screenshot.width}x#{screenshot.height}.png"
+        # Didn't match, but now we will check using resemblejs
+        deferred = Q.defer()
+        resemble(new Buffer(screenshot.data, 'base64'))
+        .compareTo(data)
+        .onComplete (result) ->
+            if result.misMatchPercentage == '0.00'
+                deferred.resolve { match: true }
+            else
+                deferred.resolve {
+                    match: false,
+                    label: label,
+                    path: path,
+                    filename: filename,
+                    actual: screenshot.data,
+                    difference: result.getImageDataUrl().substr(22),
+                    reason: "differed by #{result.misMatchPercentage}%"
+                }
 
-            try
-                matches = (screenshot.data == fs.readFileSync(path + '/' + filename).toString('base64'))
-            catch e
-                ''
+        return deferred.promise
+    , (error) ->
+        if error
+            return Q({
+                label: label,
+                path: path,
+                filename: filename,
+                actual: screenshot.data,
+                match: false,
+                missing: true
+                reason: 'missing'
+            })
 
-            if !matches
-                mkdirp.sync(path + '/failed')
+    .then (result) ->
+        if !result.match
+            saveFailureImages(result)
 
-                fs.writeFileSync(
-                    path + '/failed/' + filename,
-                    screenshot.data,
-                    { encoding: 'base64' }
+        expect(result.match).toBe(true, "#{result.label}: #{result.reason}")
+
+saveFailureImages = (result) ->
+    writeImage = (path, data) ->
+        return Q.nfcall(mkdirp, path).then () ->
+            return Q.nfcall(
+                fs.writeFile,
+                "#{path}/#{result.filename}",
+                data,
+                { encoding: 'base64'}
+            )
+
+    if result.missing
+        return Q.all([
+            writeImage("#{result.path}/missing", result.actual)
+        ])
+    else
+        return Q.all([
+            writeImage("#{result.path}/failed", result.actual)
+            writeImage("#{result.path}/diff", result.difference)
+        ])
+
+takeScreenshots = (spec, screenshotName) ->
+    setScreenSize = (width, height) ->
+        return browser.driver.manage().window().setSize(width, height)
+
+    matchingPromises = []
+    shotsTakenPromise = exports.sizes.reduce (soFar, size) ->
+        soFar.then(
+            setScreenSize(size.width, size.height)
+            .then () ->
+                return browser.takeScreenshot()
+            .then (screenshot) ->
+                matchingPromises.push(
+                    matchScreenshot(spec, screenshotName, {
+                        label: size.label,
+                        width: size.width,
+                        height: size.height,
+                        data: screenshot
+                    })
                 )
+                return true
+        )
+    , Q(true)
 
-                try
-                    mkdirp.sync(path + '/diff')
-
-                    originalData = new Buffer(screenshot.data, 'base64')
-                    expectedData = fs.readFileSync(path + '/' + filename)
-
-                    resemble(originalData)
-                    .compareTo(expectedData)
-                    .onComplete (out) ->
-                        output = out.getImageDataUrl().substr(22)
-                        fs.writeFileSync(
-                            path + '/diff/' + filename + '-diff.png',
-                            output,
-                            { encoding: 'base64' }
-                        )
-                catch e
-                    ''
-
-            return matches
-
-        # HACK(mike): Take a copy of it or it ends up writing '<screenshot>'
-        if !me.actualOriginal
-            me.actualOriginal = me.actual
-
-        allMatch = true
-        failures = []
-        me.actualOriginal.forEach (screenshot) ->
-            matches = matchScreenshot(screenshot)
-            if !matches
-                failures.push "#{screenshot.label}-#{screenshot.width}x#{screenshot.height}"
-
-            allMatch = allMatch && matches
-
-        # Suppress actual huge string
-        me.actual = '<screenshots>'
-
-        me.message = (name) ->
-            return "screenshots [#{failures.join(", ")}] for #{name} did not match"
-
-        return allMatch
-}
+    return shotsTakenPromise.then () ->
+        return Q.all(matchingPromises)
 
 exports.sizes = [
     {
@@ -128,41 +161,9 @@ exports.sizes = [
 Public API
 ###
 
-# To be called during test suite setup
-exports.initializeSuite = (suite) ->
-    beforeEach () ->
-        this.addMatchers(screenshotMatchers)
-
 # Call to take an array of screenshots during tests
-exports.takeScreenshots = () ->
+exports.checkScreenshots = (spec, screenshotName) ->
     if disableScreenshots
-        return ''
+        return
 
-    setScreenSize = (width, height) ->
-        return browser.driver.manage().window().setSize(width, height)
-
-    screenshots = []
-
-    # Take a copy of the global sizes
-    sizes = [].concat(exports.sizes)
-
-    takeNextShot = () ->
-        if sizes.length > 0
-            size = sizes.shift()
-
-            return setScreenSize(size.width, size.height)
-            .then () ->
-                return browser.takeScreenshot()
-            .then (screenshot) ->
-                screenshots.push {
-                    label: size.label,
-                    width: size.width,
-                    height: size.height,
-                    data: screenshot
-                }
-
-                return takeNextShot()
-        else
-            return screenshots
-
-    return takeNextShot()
+    return takeScreenshots(spec, screenshotName)

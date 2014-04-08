@@ -5,7 +5,6 @@ echo "Running tests for protractor-demo"
 cd protractor-demo
 node app/expressserver.js > /dev/null 2>&1 &
 ../../node_modules/.bin/protractor test/conf.js > /dev/null 2>&1
-kill $!
 cd ..
 
 # Compare the screenshots to make sure the right ones failed.

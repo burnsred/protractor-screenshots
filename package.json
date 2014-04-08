@@ -1,7 +1,7 @@
 {
   "name": "protractor-screenshots",
-  "version": "0.0.2",
-  "description": "Integrates jasmine and webdriver to let tests take and compare screenshots at different sizes.",
+  "version": "0.0.3",
+  "description": "Integrates protractor and webdriver to let tests take and compare screenshots at different sizes.",
   "main": "lib/screenshots.js",
   "scripts": {
     "test": "(cd test && bash test.sh)"
