@@ -1,0 +1,17 @@
+{
+  "name": "protractor-screenshots",
+  "version": "0.0.1",
+  "description": "Integrates jasmine and webdriver to let tests take and compare screenshots at different sizes.",
+  "main": "lib/screenshots.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Michael Bertolacci",
+  "license": "ISC",
+  "dependencies": {
+    "rimraf": "^2.2.6",
+    "mkdirp": "^0.3.5",
+    "resemble": "^1.0.3",
+    "slug": "^0.4.2"
+  }
+}
