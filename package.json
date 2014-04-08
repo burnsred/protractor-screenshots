@@ -1,6 +1,6 @@
 {
   "name": "protractor-screenshots",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Integrates protractor and webdriver to let tests take and compare screenshots at different sizes.",
   "main": "lib/screenshots.js",
   "scripts": {
@@ -21,6 +21,7 @@
   "devDependencies": {
     "express": "^3.5.1",
     "protractor": "^0.21.0",
-    "phantomjs": "^1.9.7-3"
+    "phantomjs": "^1.9.7-3",
+    "q": "^1.0.1"
   }
 }
