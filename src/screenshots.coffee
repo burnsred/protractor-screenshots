@@ -4,13 +4,32 @@ rimraf = require 'rimraf'
 slug = require 'slug'
 resemble = require('resemble').resemble
 Q = require 'q'
+_ = require 'lodash'
 
-browserName = ''
-browser.getCapabilities().then (capabilities) ->
-    browserName = capabilities.caps_.browserName.toLowerCase()
+capabilityString = ''
+capabilities = null
+browser.getCapabilities().then (returnValue) ->
+    capabilities = returnValue.caps_
 
-disableScreenshots = browser.params['disable-screenshots']
-screenshotBase = browser.params['screenshots-base-path'] || '.'
+    browserName = returnValue.caps_.browserName.toLowerCase()
+    platform = returnValue.caps_.platform.toLowerCase()
+    version = returnValue.caps_.version.toLowerCase()
+
+    capabilityString = "#{platform}-#{browserName}-#{version}"
+
+disableScreenshots = browser.params['disableScreenshots']
+screenshotBase = browser.params['screenshotsBasePath'] || '.'
+
+screenshotSizes = browser.params['screenshotSizes'] 
+
+matchesCapabilities = (other) ->
+    excludeKeys = ['sizes']
+
+    return _.every other, (value, key) ->
+        if excludeKeys.indexOf(key) != -1
+            return true
+
+        return capabilities[key] == value
 
 getPath = (suite) ->
     buildName = (suite) ->
@@ -19,13 +38,13 @@ getPath = (suite) ->
             prefix = "#{buildName(suite.parentSuite)} "
         return "#{prefix}#{suite.description}"
 
-    return screenshotBase + '/' + slug(buildName(suite)) + '/' + browserName
+    return "#{screenshotBase}/#{slug(buildName(suite))}/#{slug(capabilityString)}"
 
 matchScreenshot = (spec, screenshotName, screenshot) ->
     path = getPath(spec.suite)
 
-    label = "#{screenshotName} - #{screenshot.label}-#{screenshot.width}x#{screenshot.height}"
-    filename = "#{slug(spec.description + " " + screenshotName)}-#{screenshot.label}-#{screenshot.width}x#{screenshot.height}.png"
+    label = "#{screenshotName} - #{screenshot.width}x#{screenshot.height}"
+    filename = "#{slug(spec.description + " " + screenshotName)}-#{screenshot.width}x#{screenshot.height}.png"
 
     return Q.fcall () ->
         if not spec.suite._screenshotsInitialized
@@ -81,7 +100,7 @@ matchScreenshot = (spec, screenshotName, screenshot) ->
         if !result.match
             saveFailureImages(result)
 
-        expect(result.match).toBe(true, "#{result.label}: #{result.reason}")
+        expect(result.match).toBe(true, "#{result.label} on #{capabilityString}: #{result.reason}")
 
 saveFailureImages = (result) ->
     writeImage = (path, data) ->
@@ -103,67 +122,40 @@ saveFailureImages = (result) ->
             writeImage("#{result.path}/diff", result.difference)
         ])
 
-takeScreenshots = (spec, screenshotName) ->
+takeScreenshot = (spec, screenshotName) ->
     setScreenSize = (width, height) ->
         return browser.driver.manage().window().setSize(width, height)
 
-    matchingPromises = []
-    shotsTakenPromise = exports.sizes.reduce (soFar, size) ->
-        soFar.then(
-            setScreenSize(size.width, size.height)
-            .then () ->
-                return browser.takeScreenshot()
-            .then (screenshot) ->
-                matchingPromises.push(
-                    matchScreenshot(spec, screenshotName, {
-                        label: size.label,
-                        width: size.width,
-                        height: size.height,
-                        data: screenshot
-                    })
-                )
-                return true
-        )
-    , Q(true)
+    screenSizes = _.find(screenshotSizes, matchesCapabilities)?.sizes
 
-    return shotsTakenPromise.then () ->
-        return Q.all(matchingPromises)
+    actualTakeScreenshot = () ->
+        browser.driver.manage().window().getSize()
+        .then (screenSize) ->
+            browser.takeScreenshot()
+            .then (data) ->
+                matchScreenshot(spec, screenshotName, {
+                    width: screenSize.width,
+                    height: screenSize.height,
+                    data: data
+                })
 
-exports.sizes = [
-    {
-        label: 'desktop',
-        width: 1280,
-        height: 1000
-    },
-    {
-        label: 'ipad-landscape'
-        width: 1024
-        height: 1000
-    },
-    {
-        label: 'ipad-portrait'
-        width: 768
-        height: 1000
-    },
-    {
-        label: 'iphone-landscape'
-        width: 480
-        height: 1000
-    },
-    {
-        label: 'iphone-portrait'
-        width: 320
-        height: 1000
-    }
-]
+    if screenSizes?.length > 0
+        screenSizes.reduce (soFar, size) ->
+            soFar.then(
+                setScreenSize(size.width, size.height)
+                .then () ->
+                    return actualTakeScreenshot()
+            )
+        , Q(true)
+    else
+        return actualTakeScreenshot()
 
 ###
 Public API
 ###
 
-# Call to take an array of screenshots during tests
-exports.checkScreenshots = (spec, screenshotName) ->
+exports.checkScreenshot = (spec, screenshotName) ->
     if disableScreenshots
         return
 
-    return takeScreenshots(spec, screenshotName)
+    return takeScreenshot(spec, screenshotName)

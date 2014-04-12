@@ -6,7 +6,7 @@ describe('slow calculator', function() {
   });
 
   it('should add numbers', function() {
-    screenshots.checkScreenshots(this, 'blank-screen');
+    screenshots.checkScreenshot(this, 'blank-screen');
 
     element(by.model('first')).sendKeys(4);
     element(by.model('second')).sendKeys(5);
@@ -16,7 +16,7 @@ describe('slow calculator', function() {
     expect(element(by.binding('latest')).getText()).
         toEqual('9');
 
-    screenshots.checkScreenshots(this, 'numbers-added');
+    screenshots.checkScreenshot(this, 'numbers-added');
   });
 
   describe('memory', function() {
@@ -33,7 +33,7 @@ describe('slow calculator', function() {
 
       expect(memory.count()).toEqual(0);
 
-      screenshots.checkScreenshots(this, 'empty-memory');
+      screenshots.checkScreenshot(this, 'empty-memory');
     });
 
     it('should fill the memory with past results', function() {
@@ -54,7 +54,7 @@ describe('slow calculator', function() {
         expect(arr[0].getText()).toEqual('30'); // 10 + 20 = 30
         expect(arr[1].getText()).toEqual('2'); // 1 + 1 = 2
 
-        screenshots.checkScreenshots(spec, 'full-memory');
+        screenshots.checkScreenshot(spec, 'full-memory');
       });
     });
   });

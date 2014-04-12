@@ -15,7 +15,22 @@ exports.config = {
   ],
 
   params: {
-    'screenshots-base-path': 'test/screenshots'
+    screenshotsBasePath: 'test/screenshots',
+    screenshotSizes: [
+        {
+          browserName: 'phantomjs',
+          sizes: [
+            { width: 320, height: 480 }, // iPhone portrait
+            { width: 768, height: 1024 } // iPad landscape
+          ]
+        },
+        {
+          browserName: 'chrome',
+          sizes: [
+            { width: 500, height: 500 },
+          ]
+        }
+    ],
   },
 
   baseUrl: 'http://localhost:8888',
