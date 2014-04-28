@@ -122,7 +122,7 @@ saveFailureImages = (result) ->
             writeImage("#{result.path}/diff", result.difference)
         ])
 
-takeScreenshot = (spec, screenshotName, delay) ->
+takeScreenshot = (spec, screenshotName, delay, beforeEach) ->
     setScreenSize = (width, height) ->
         return browser.driver.manage().window().setSize(width, height)
 
@@ -131,6 +131,7 @@ takeScreenshot = (spec, screenshotName, delay) ->
     actualTakeScreenshot = () ->
         browser.driver.manage().window().getSize()
         .then (screenSize) ->
+            beforeEach()
             browser.takeScreenshot()
             .then (data) ->
                 matchScreenshot(spec, screenshotName, {
@@ -156,10 +157,11 @@ takeScreenshot = (spec, screenshotName, delay) ->
 Public API
 ###
 
-exports.checkScreenshot = (spec, screenshotName, delay) ->
+exports.checkScreenshot = (spec, screenshotName, delay={}, beforeEach) ->
     if disableScreenshots
         return
 
     delay = delay || 0
+    beforeEach = beforeEach || () ->
 
-    return takeScreenshot(spec, screenshotName, delay)
+    return takeScreenshot(spec, screenshotName, delay, beforeEach)
