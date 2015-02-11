@@ -6,7 +6,7 @@ npm install protractor-screenshots
 
 At the top of the test spec you need
 ```js
-screenshots = require('protractor-screenshots');
+var screenshots = require('protractor-screenshots');
 ```
 
 During a test, run
